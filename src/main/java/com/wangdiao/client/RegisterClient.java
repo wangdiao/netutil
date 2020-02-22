@@ -1,4 +1,4 @@
-package com.wangdiao;
+package com.wangdiao.client;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -8,28 +8,32 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 
-public class TimeClient {
+public class RegisterClient {
     public static void main(String[] args) throws Exception {
         String host = args[0];
         int port = Integer.parseInt(args[1]);
+        String localHost = args[2];
+        int localPort = Integer.parseInt(args[3]);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        
         try {
-            Bootstrap b = new Bootstrap(); // (1)
-            b.group(workerGroup); // (2)
-            b.channel(NioSocketChannel.class); // (3)
-            b.option(ChannelOption.SO_KEEPALIVE, true); // (4)
+            Bootstrap b = new Bootstrap();
+            b.group(workerGroup);
+            b.channel(NioSocketChannel.class);
+            b.option(ChannelOption.SO_KEEPALIVE, true);
             b.handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 public void initChannel(SocketChannel ch) {
-                    ch.pipeline().addLast(new TimeDecoder(), new TimeClientHandler());
+                    ch.pipeline().addLast(new ObjectEncoder(),
+                            new ObjectDecoder(ClassResolvers.weakCachingResolver(null)),
+                            new RegisterClientHandler(localHost, localPort, workerGroup));
                 }
             });
-            
             // Start the client.
-            ChannelFuture f = b.connect(host, port).sync(); // (5)
-
+            ChannelFuture f = b.connect(host, port).sync();
             // Wait until the connection is closed.
             f.channel().closeFuture().sync();
         } finally {

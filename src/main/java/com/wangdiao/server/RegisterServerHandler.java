@@ -1,42 +1,38 @@
-package com.wangdiao;
+package com.wangdiao.server;
 
-import io.netty.buffer.ByteBuf;
+import com.wangdiao.model.TransferData;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Handles a server-side channel.
+ *
+ * @author wangdiao
  */
 @Slf4j
-public class P2PServerHandler extends ChannelInboundHandlerAdapter {
+public class RegisterServerHandler extends ChannelInboundHandlerAdapter {
 
-    private P2PContext p2PContext;
+    private PeerContext peerContext;
 
-    public P2PServerHandler(P2PContext p2PContext) {
-        this.p2PContext = p2PContext;
+    public RegisterServerHandler(PeerContext peerContext) {
+        this.peerContext = peerContext;
     }
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
-        p2PContext.getContext().add(ctx);
+        peerContext.setRegisterChannelContext(ctx);
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        p2PContext.getContext().remove(ctx);
+        peerContext.setRegisterChannelContext(null);
     }
-
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        ByteBuf in = (ByteBuf) msg;
-        try {
-            p2PContext.getPeerContext().forEach(x -> x.writeAndFlush(in));
-        } finally {
-            ReferenceCountUtil.release(msg);
-        }
+        TransferData data = (TransferData) msg;
+        peerContext.writeToClient(data);
     }
 
     @Override

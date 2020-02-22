@@ -1,31 +1,28 @@
-package com.wangdiao;
+package com.wangdiao.server;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-
-import java.util.ArrayList;
-import java.util.List;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 
 /**
- * Discards any incoming data.
+ * 控制服务.
+ *
+ * @author wangdiao
  */
-public class PassiveChannelServer {
+public class ControlServer {
 
     private int port;
-    private List<ChannelHandlerContext> contexts = new ArrayList<>();
-    private RegisterServer registerServer;
 
-    public PassiveChannelServer(int port, RegisterServer registerServer) {
+    public ControlServer(int port) {
         this.port = port;
-        this.registerServer = registerServer;
-        this.registerServer.setPassiveServer(this);
-    }
-
-    public List<ChannelHandlerContext> getContexts() {
-        return contexts;
     }
 
     public void run() throws Exception {
@@ -33,13 +30,14 @@ public class PassiveChannelServer {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
             ServerBootstrap b = new ServerBootstrap();
-            P2PServerHandler p2PServerHandler = new P2PServerHandler(new ArrayList<>());
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         public void initChannel(SocketChannel ch) throws Exception {
-                            ch.pipeline().addLast(new CommandDecoder(bossGroup, workerGroup, p2PServerHandler), p2PServerHandler);
+                            ch.pipeline().addLast(new ObjectEncoder(),
+                                    new ObjectDecoder(ClassResolvers.weakCachingResolver(null)),
+                                    new ControlServerHandler(bossGroup, workerGroup));
                         }
                     })
                     .option(ChannelOption.SO_BACKLOG, 128)
