@@ -4,49 +4,52 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.channel.ChannelHandlerContext;
 
 import java.net.InetSocketAddress;
-import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
-public class UdpContext {
-    public static final ExecutorService executorService = new ThreadPoolExecutor(2, 2,
+/**
+ * @author wangdiao
+ */
+public class UdpClientContext {
+    private UdpConnectContext connectContext;
+
+    private static final ExecutorService executorService = new ThreadPoolExecutor(2, 2,
             0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
             new ThreadFactoryBuilder().setNameFormat("udp-context-pool-%d").build());
-    private Map<Long, UdpConnectContext> connectContextMap = new ConcurrentHashMap<>();
-    private AtomicLong atomicConnectId = new AtomicLong();
 
-    public void createConnect(ChannelHandlerContext ctx, InetSocketAddress sender, ContextListener listener) {
-        long connectId = atomicConnectId.incrementAndGet();
-        UdpConnectContext connectContext = new UdpConnectContext(connectId, ctx, executorService, listener);
-        connectContextMap.put(connectId, connectContext);
-        UdpPacket resPacket = connectContext.newUdpPacket(true, ControlMessageType.CREATE_RSP,
-                null, sender);
-        connectContext.send(resPacket, isSend -> connectContext.start());
+    public UdpClientContext(UdpConnectContext connectContext) {
+        this.connectContext = connectContext;
     }
 
-    public void closeConnect(long connectId, InetSocketAddress recipient) {
-        UdpConnectContext connectContext = connectContextMap.get(connectId);
+    public static CompletableFuture<UdpClientContext> createConnect(ChannelHandlerContext ctx, InetSocketAddress sender,
+                                                                    ContextListener listener) {
+        UdpConnectContext preConnectContext = new UdpConnectContext(0L, ctx, executorService, listener);
+        UdpPacket resPacket = preConnectContext.newUdpPacket(true, ControlMessageType.CREATE,
+                null, sender);
+        CompletableFuture<UdpHeader> send = preConnectContext.send(resPacket);
+        return send.thenApply(header -> {
+            UdpConnectContext cc = new UdpConnectContext(header.getConnectId(), ctx, executorService, listener);
+            return new UdpClientContext(cc);
+        });
+    }
+
+    public void closeConnect(InetSocketAddress recipient) {
         UdpPacket udpPacket = connectContext.newUdpPacket(true, ControlMessageType.CLOSE, null, recipient);
-        connectContext.send(udpPacket, x -> connectContext.close());
+        connectContext.send(udpPacket).thenAccept(x -> connectContext.close());
         connectContext.closing();
-        connectContextMap.remove(connectId);
     }
 
     public void ack(UdpPacket udpPacket) {
-        connectContextMap.get(udpPacket.getConnectId()).ack(udpPacket);
+        connectContext.ack(udpPacket);
     }
 
     public void receive(UdpPacket udpPacket) {
-        UdpConnectContext connectContext = connectContextMap.get(udpPacket.getConnectId());
         UdpPacket ackPacket = connectContext.newUdpPacket(true, ControlMessageType.ACK,
                 null, udpPacket.getSender());
-        connectContext.send(ackPacket, null);
+        connectContext.send(ackPacket);
         connectContext.receive(udpPacket);
     }
 
-    public Future<Boolean> send(UdpPacket udpPacket, Consumer<Boolean> consumer) {
-        UdpConnectContext connectContext = connectContextMap.get(udpPacket.getConnectId());
-        return connectContext.send(udpPacket, consumer);
+    public CompletableFuture<UdpHeader> send(UdpPacket udpPacket) {
+        return connectContext.send(udpPacket);
     }
 }

@@ -1,4 +1,9 @@
 package com.wangdiao.udp;
 
-public class ContextListener {
+import io.netty.buffer.ByteBuf;
+
+import java.util.EventListener;
+
+public interface ContextListener extends EventListener {
+    void onRead(ByteBuf buf);
 }

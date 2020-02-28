@@ -5,7 +5,6 @@ import com.wangdiao.model.TransferData;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoopGroup;
-import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.SocketAddress;
@@ -66,7 +65,7 @@ public class PeerContext {
     }
 
     public void writeToRegister(TransferData data) {
-        if(registerChannelContext!=null) {
+        if (registerChannelContext != null) {
             registerChannelContext.writeAndFlush(data);
         }
     }
