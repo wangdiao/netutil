@@ -19,6 +19,7 @@ public class UdpPacket extends DefaultByteBufHolder {
     private long sendTime = 0L;
     private UdpHeader udpHeader;
     private ByteBuf byteBuf;
+    public static final int MAX_PACKET = 1300;
 
     public UdpPacket(InetSocketAddress recipient, InetSocketAddress sender, ByteBuf byteBuf) {
         super(byteBuf);

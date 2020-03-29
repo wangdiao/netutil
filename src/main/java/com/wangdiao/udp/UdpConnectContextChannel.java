@@ -4,13 +4,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayDeque;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,12 +16,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author wangdiao
  */
 @Slf4j
-public class UdpConnectContext implements Runnable {
-    private final long connectId;
+public class UdpConnectContextChannel implements Runnable {
+    private long connectId;
     private final ChannelHandlerContext ctx;
     private Queue<UdpPacket> receivedPacket = new ArrayDeque<>();
     private Map<Integer, UdpPacket> packetMap = new ConcurrentHashMap<>();
-    private BlockingQueue<Integer> sendQueue = new ArrayBlockingQueue<>(1000);
+    private BlockingQueue<Integer> sendQueue = new ArrayBlockingQueue<>(4096);
     private Map<Integer, UdpPacket> sendMap = new ConcurrentHashMap<>();
     private Map<Integer, CompletableFuture<UdpHeader>> sendFutureMap = new ConcurrentHashMap<>();
     private Queue<Integer> sendingQueue = new ArrayDeque<>();
@@ -34,22 +32,43 @@ public class UdpConnectContext implements Runnable {
     private volatile int status = NEW;
     private volatile boolean running = false;
     public static final int NEW = 0;
-    public static final int STARTED = 1;
+    public static final int ACTIVE = 1;
     public static final int CLOSING = 2;
     public static final int CLOSED = 3;
     public final ExecutorService executorService;
     private ContextListener listener;
+    @Getter
+    private InetSocketAddress peerSocketAddress;
     private AtomicInteger packetNumber = new AtomicInteger();
+    private BlockingQueue<Integer> ackQueue = new ArrayBlockingQueue<>(4096);
 
-    public UdpConnectContext(long connectId, ChannelHandlerContext ctx, ExecutorService executorService, ContextListener listener) {
+    public UdpConnectContextChannel(long connectId, ChannelHandlerContext ctx, ExecutorService executorService,
+                                    InetSocketAddress peerSocketAddress, ContextListener listener) {
         this.connectId = connectId;
         this.ctx = ctx;
         this.executorService = executorService;
+        this.peerSocketAddress = peerSocketAddress;
         this.listener = listener;
     }
 
-    public void receive(UdpPacket udpPacket) {
-        this.sendAck(udpPacket);
+    public static UdpConnectContextChannel createClient(ChannelHandlerContext ctx, ExecutorService executorService,
+                                                        InetSocketAddress peerSocketAddress, ContextListener listener) {
+        UdpPacket packet = new UdpPacket(true, ControlMessageType.CREATE, 0, 0, null, peerSocketAddress);
+        sendDirect(ctx, packet);
+        return new UdpConnectContextChannel(0L, ctx, executorService, peerSocketAddress, listener);
+    }
+
+    /**
+     * 关闭连接
+     */
+    public void closeChannel() {
+        UdpPacket udpPacket = this.newUdpPacket(true, ControlMessageType.CLOSE, null, peerSocketAddress);
+        this.send(udpPacket).thenAccept(x -> this.close());
+        this.closing();
+    }
+
+    public void receive(UdpPacket udpPacket) throws InterruptedException {
+        this.sendAck(udpPacket.getUdpHeader().getPacketNumber());
         int nextPn = receivedPackageNumber + 1;
         if (udpPacket.getUdpHeader().getPacketNumber() == nextPn) {
             this.receive0(udpPacket);
@@ -60,13 +79,17 @@ public class UdpConnectContext implements Runnable {
         //小于nextPn的情况直接忽略
     }
 
-    public void sendAck(UdpPacket udpPacket) {
-        UdpPacket ackPacket = newUdpPacket(true, ControlMessageType.ACK, null, udpPacket.getSender());
-        this.sendDirect(ackPacket);
+    public void sendAckDirect(int pn) {
+        ByteBuf byteBuf = this.ctx.alloc().buffer();
+        byteBuf.writeMedium(pn);
+        byteBuf.writeByte(1);
+        UdpPacket udpPacket = new UdpPacket(true, ControlMessageType.ACK, 0, connectId,
+                byteBuf, peerSocketAddress);
+        sendDirect(this.ctx, udpPacket);
     }
 
     public CompletableFuture<UdpHeader> send(UdpPacket udpPacket) {
-        if (!this.isClosing()) {
+        if (this.isClosing()) {
             return CompletableFuture.completedFuture(null);
         }
         CompletableFuture<UdpHeader> future = new CompletableFuture<>();
@@ -113,10 +136,19 @@ public class UdpConnectContext implements Runnable {
 
     public void close() {
         this.status = CLOSED;
+        this.listener.onClose();
     }
 
     public void ack(UdpPacket udpPacket) {
         Collection<Integer> ackPackets = Ack.getAckPackets(udpPacket.getByteBuf());
+        if (this.status < ACTIVE) {
+            if (ackPackets.contains(0)) {
+                this.connectId = udpPacket.getUdpHeader().getConnectId();
+                this.fireActive();
+                ReferenceCountUtil.release(udpPacket);
+                return;
+            }
+        }
         sendingQueue.removeAll(ackPackets);
         for (Integer i : ackPackets) {
             UdpPacket packet = sendMap.remove(i);
@@ -173,12 +205,13 @@ public class UdpConnectContext implements Runnable {
             if (udpPacket == null) {
                 return true;
             }
-            if (udpPacket.getUdpHeader().getType() == ControlMessageType.CLOSE) {
-                this.closing();
-            }
-            this.listener.onRead(udpPacket.getByteBuf());
-            if (this.isClose()) {
-                return true;
+            try {
+                this.listener.onRead(udpPacket.getByteBuf().retain());
+                if (this.isClose()) {
+                    return true;
+                }
+            } finally {
+                ReferenceCountUtil.release(udpPacket);
             }
         }
         return false;
@@ -192,17 +225,17 @@ public class UdpConnectContext implements Runnable {
             //重发的包未超时不再发送
             return;
         }
-        this.sendDirect(udpPacket);
+        sendDirect(this.ctx, udpPacket);
+        udpPacket.setSendTime(sendTime);
         this.sendingQueue.offer(pn);
         this.sendTime = sendTime;
     }
 
-    private void sendDirect(UdpPacket udpPacket) {
+    private static void sendDirect(ChannelHandlerContext ctx, UdpPacket udpPacket) {
         ByteBuf buffer = ctx.alloc().buffer();
         udpPacket.write(buffer);
-        udpPacket.setSendTime(sendTime);
         DatagramPacket data = new DatagramPacket(buffer, udpPacket.getRecipient());
-        this.ctx.writeAndFlush(data);
+        ctx.writeAndFlush(data);
     }
 
     private void fireStart() {
@@ -214,11 +247,15 @@ public class UdpConnectContext implements Runnable {
 
     @Override
     public void run() {
+        if (this.status < ACTIVE) {
+            return;
+        }
         boolean finish = false;
         try {
             this.running = true;
+            finish = this.startSendAck();
             //待发送队列
-            finish = this.startSend();
+            finish = finish && this.startSend();
             if (this.isClose()) {
                 return;
             }
@@ -232,6 +269,7 @@ public class UdpConnectContext implements Runnable {
             if (!this.isActive()) {
                 this.close();
             }
+
         } catch (Throwable e) {
             log.error("run failed.", e);
         } finally {
@@ -244,16 +282,42 @@ public class UdpConnectContext implements Runnable {
         }
     }
 
-    public int nextPacketNumber() {
-        return packetNumber.incrementAndGet();
+    private boolean startSendAck() {
+        if (ackQueue.isEmpty()) {
+            return true;
+        }
+        List<Integer> list = new ArrayList<>();
+        ackQueue.drainTo(list);
+        while (!list.isEmpty()) {
+            ByteBuf byteBuf = this.ctx.alloc().buffer(128, UdpPacket.MAX_PACKET);
+            list = Ack.fillUdpPacketBody(byteBuf, list);
+            UdpPacket udpPacket = new UdpPacket(true, ControlMessageType.ACK, 0, connectId, byteBuf, peerSocketAddress);
+            sendDirect(this.ctx, udpPacket);
+        }
+        return false;
     }
 
-    public void start() {
-        this.status = STARTED;
+    public int nextPacketNumber() {
+        return packetNumber.incrementAndGet();
     }
 
     public UdpPacket newUdpPacket(boolean control, ControlMessageType type, ByteBuf byteBuf, InetSocketAddress recipient) {
         int pn = this.nextPacketNumber();
         return new UdpPacket(control, type, pn, connectId, byteBuf, recipient);
+    }
+
+    public void sendAck(int pn) throws InterruptedException {
+        this.ackQueue.put(pn);
+    }
+
+    public void fireActive() {
+        this.status = ACTIVE;
+        this.fireStart();
+        this.listener.onActive();
+    }
+
+    public void passiveCloseChannel(int pn) throws InterruptedException {
+        this.sendAck(pn);
+        this.closing();
     }
 }

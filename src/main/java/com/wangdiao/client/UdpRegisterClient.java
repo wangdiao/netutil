@@ -1,5 +1,7 @@
 package com.wangdiao.client;
 
+import com.wangdiao.udp.UdpServerContext;
+import com.wangdiao.udp.UdpServerMessageHandle;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -13,8 +15,15 @@ import io.netty.channel.socket.nio.NioDatagramChannel;
  */
 public class UdpRegisterClient {
 
+    private String name;
+
+    public UdpRegisterClient(String name) {
+        this.name = name;
+    }
+
     public void run() throws Exception {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+        UdpServerContext udpContext = new UdpServerContext();
         try {
             Bootstrap b = new Bootstrap();
             b.group(workerGroup)
@@ -22,7 +31,7 @@ public class UdpRegisterClient {
                     .handler(new ChannelInitializer<DatagramChannel>() {
                         @Override
                         protected void initChannel(DatagramChannel ch) throws Exception {
-                            ch.pipeline().addLast(new UdpRegisterClientHandler());
+                            ch.pipeline().addLast(new UdpRegisterClientHandler(name), new UdpServerMessageHandle(udpContext));
                         }
                     });
 
@@ -39,7 +48,7 @@ public class UdpRegisterClient {
     }
 
     public static void main(String[] args) throws Exception {
-        UdpRegisterClient client = new UdpRegisterClient();
+        UdpRegisterClient client = new UdpRegisterClient("test1");
         client.run();
     }
 }

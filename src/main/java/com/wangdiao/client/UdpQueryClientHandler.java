@@ -18,12 +18,12 @@ import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @ChannelHandler.Sharable
-public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
+public class UdpQueryClientHandler extends ChannelInboundHandlerAdapter {
     private String name;
     private volatile int status = AppConstants.UDP_CLIENT_STATUS_INIT;
     private UdpServerMessageHandle udpMessageHandle;
 
-    public UdpRegisterClientHandler(String name) {
+    public UdpQueryClientHandler(String name) {
         this.name = name;
     }
 
@@ -31,7 +31,7 @@ public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         log.info("channelActive {}", ctx);
         ByteBuf buffer = ctx.alloc().buffer();
-        buffer.writeInt(AppConstants.OP_REG);
+        buffer.writeInt(AppConstants.OP_QUERY);
         buffer.writeInt(ByteBufUtil.utf8Bytes(name));
         buffer.writeCharSequence(name, StandardCharsets.UTF_8);
         DatagramPacket datagramPacket = new DatagramPacket(buffer, new InetSocketAddress("localhost", 9998));
@@ -54,6 +54,5 @@ public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
         } else if (status == AppConstants.UDP_CLIENT_STATUS_CREATED) {
             super.channelRead(ctx, msg);
         }
-
     }
 }

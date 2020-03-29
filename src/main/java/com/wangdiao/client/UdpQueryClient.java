@@ -1,40 +1,43 @@
-package com.wangdiao.server;
+package com.wangdiao.client;
 
+import com.wangdiao.udp.UdpServerContext;
+import com.wangdiao.udp.UdpServerMessageHandle;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 
 /**
  * @author wangdiao
  */
-public class UdpDiscoverServer {
-    private int port;
+public class UdpQueryClient {
 
-    public UdpDiscoverServer(int port) {
-        this.port = port;
+    private String name;
+
+    public UdpQueryClient(String name) {
+        this.name = name;
     }
 
     public void run() throws Exception {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+        UdpServerContext udpContext = new UdpServerContext();
         try {
             Bootstrap b = new Bootstrap();
             b.group(workerGroup)
                     .channel(NioDatagramChannel.class)
                     .handler(new ChannelInitializer<DatagramChannel>() {
                         @Override
-                        public void initChannel(DatagramChannel ch) throws Exception {
-                            ch.pipeline().addLast(new UdpDiscoverServerHandle());
+                        protected void initChannel(DatagramChannel ch) throws Exception {
+                            ch.pipeline().addLast(new UdpQueryClientHandler(name), new UdpServerMessageHandle(udpContext));
                         }
                     });
 
             // Bind and start to accept incoming connections.
-            ChannelFuture f = b.bind(port).sync();
+            ChannelFuture f = b.bind(0).sync();
+
             // Wait until the server socket is closed.
             // In this example, this does not happen, but you can do that to gracefully
             // shut down your server.
@@ -45,7 +48,7 @@ public class UdpDiscoverServer {
     }
 
     public static void main(String[] args) throws Exception {
-        UdpDiscoverServer server = new UdpDiscoverServer(9998);
-        server.run();
+        UdpQueryClient client = new UdpQueryClient("test1");
+        client.run();
     }
 }

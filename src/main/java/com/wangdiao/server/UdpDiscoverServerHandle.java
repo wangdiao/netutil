@@ -1,5 +1,6 @@
 package com.wangdiao.server;
 
+import com.wangdiao.common.AppConstants;
 import com.wangdiao.model.DiscoverData;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -19,8 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class UdpDiscoverServerHandle extends ChannelInboundHandlerAdapter {
 
-    public static final int OP_REG = 1;
-    public static final int OP_QUERY = 2;
     private Map<CharSequence, InetSocketAddress> registers = new ConcurrentHashMap<>();
 
     @Override
@@ -29,16 +28,19 @@ public class UdpDiscoverServerHandle extends ChannelInboundHandlerAdapter {
         DatagramPacket packet = (DatagramPacket) msg;
         try {
             ByteBuf content = packet.content();
-            CharSequence name = content.readCharSequence(content.readInt(), StandardCharsets.UTF_8);
             int op = content.readInt();
+            CharSequence name = content.readCharSequence(content.readInt(), StandardCharsets.UTF_8);
             InetSocketAddress sender = packet.sender();
             DiscoverData discoverData;
-            if (op == OP_REG) {
+            if (op == AppConstants.OP_REG) {
                 registers.put(name, sender);
                 discoverData = new DiscoverData(name, sender);
-            } else {
+            } else if (op == AppConstants.OP_QUERY) {
                 InetSocketAddress socketAddress = registers.get(name);
                 discoverData = new DiscoverData(name, socketAddress);
+            } else {
+                log.error("unknown op from {}, op={}", sender, op);
+                return;
             }
             ByteBuf buffer = ctx.alloc().buffer();
             discoverData.write(buffer);

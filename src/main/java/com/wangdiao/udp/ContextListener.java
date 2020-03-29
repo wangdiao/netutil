@@ -5,5 +5,12 @@ import io.netty.buffer.ByteBuf;
 import java.util.EventListener;
 
 public interface ContextListener extends EventListener {
-    void onRead(ByteBuf buf);
+    default void onActive() {
+    }
+
+    default void onRead(ByteBuf buf) {
+    }
+
+    default void onClose() {
+    }
 }

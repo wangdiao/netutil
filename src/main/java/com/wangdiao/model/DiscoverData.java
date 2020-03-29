@@ -36,9 +36,9 @@ public class DiscoverData implements Serializable {
 
     public void read(ByteBuf buf) throws UnknownHostException {
         this.name = buf.readCharSequence(buf.readInt(), StandardCharsets.UTF_8);
-        int port = buf.readInt();
         byte[] address = new byte[buf.readInt()];
         buf.readBytes(address);
+        int port = buf.readInt();
         InetAddress inetAddress = InetAddress.getByAddress(address);
         this.socketAddress = new InetSocketAddress(inetAddress, port);
     }
