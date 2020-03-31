@@ -1,10 +1,13 @@
 package com.wangdiao.udp;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.InetSocketAddress;
@@ -13,28 +16,25 @@ import java.net.InetSocketAddress;
  * @author wangdiao
  */
 @Slf4j
-public class UdpClientMessageHandle extends ChannelInboundHandlerAdapter {
+@ChannelHandler.Sharable
+public class UdpClientMessageHandle extends ChannelDuplexHandler {
     private UdpClientContext udpContext;
+    @Setter
     private InetSocketAddress peerSocketAddress;
+
+    public UdpClientMessageHandle() {
+    }
 
     public UdpClientMessageHandle(InetSocketAddress peerSocketAddress) {
         this.peerSocketAddress = peerSocketAddress;
     }
 
     public ContextListener contextListener = new ContextListener() {
-        @Override
-        public void onActive() {
-
-        }
-
-        @Override
-        public void onRead(ByteBuf buf) {
-            ReferenceCountUtil.release(buf);
-        }
     };
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        assert peerSocketAddress != null;
         udpContext = UdpClientContext.createConnectChannel(ctx, peerSocketAddress, contextListener);
     }
 
@@ -45,6 +45,7 @@ public class UdpClientMessageHandle extends ChannelInboundHandlerAdapter {
         InetSocketAddress recipient = packet.recipient();
         InetSocketAddress sender = packet.sender();
         UdpPacket udpPacket = new UdpPacket(recipient, sender, packet.content());
+        udpPacket.setCtx(ctx);
         UdpHeader udpHeader = udpPacket.getUdpHeader();
         if (udpHeader.isControl()) {
             switch (udpHeader.getType()) {
@@ -64,4 +65,10 @@ public class UdpClientMessageHandle extends ChannelInboundHandlerAdapter {
     }
 
 
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+        assert msg instanceof ByteBuf;
+        ByteBuf buf = (ByteBuf) msg;
+        udpContext.send(ctx, buf);
+    }
 }

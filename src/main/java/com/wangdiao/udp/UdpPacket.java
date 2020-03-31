@@ -2,27 +2,32 @@ package com.wangdiao.udp;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.DefaultByteBufHolder;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.ReferenceCountUtil;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import java.net.InetSocketAddress;
 
 /**
  * @author wangdiao
  */
+@ToString
 @Getter
-public class UdpPacket extends DefaultByteBufHolder {
+public class UdpPacket {
     private InetSocketAddress recipient;
     private InetSocketAddress sender;
     @Setter
     private long sendTime = 0L;
     private UdpHeader udpHeader;
-    private ByteBuf byteBuf;
+    @ToString.Exclude
+    private byte[] bytes;
+    @Setter
+    private ChannelHandlerContext ctx;
     public static final int MAX_PACKET = 1300;
 
     public UdpPacket(InetSocketAddress recipient, InetSocketAddress sender, ByteBuf byteBuf) {
-        super(byteBuf);
         this.recipient = recipient;
         this.sender = sender;
         UdpHeader header = new UdpHeader();
@@ -32,12 +37,12 @@ public class UdpPacket extends DefaultByteBufHolder {
         header.setPacketNumber(byteBuf.readUnsignedMedium());
         header.setConnectId(byteBuf.readUnsignedInt());
         this.udpHeader = header;
-        this.byteBuf = byteBuf;
+        this.bytes = ByteBufUtil.getBytes(byteBuf);
+        ReferenceCountUtil.release(byteBuf);
     }
 
     public UdpPacket(boolean control, ControlMessageType type,
-                     int packetNumber, long connectId, ByteBuf byteBuf, InetSocketAddress recipient) {
-        super(byteBuf);
+                     int packetNumber, long connectId, byte[] bytes, InetSocketAddress recipient) {
         this.recipient = recipient;
         UdpHeader header = new UdpHeader();
         header.setControl(control);
@@ -45,15 +50,14 @@ public class UdpPacket extends DefaultByteBufHolder {
         header.setPacketNumber(packetNumber);
         header.setConnectId(connectId);
         this.udpHeader = header;
-        this.byteBuf = byteBuf;
+        this.bytes = bytes;
     }
 
-    public ByteBuf write(ByteBuf buf) {
+    public void write(ByteBuf buf) {
         byte b = (byte) (this.udpHeader.isControl() ? 0b00000000 : 0b10000000);
         buf.writeByte(b | this.udpHeader.getType().getData());
         buf.writeMedium(this.udpHeader.getPacketNumber());
         buf.writeInt((int) this.udpHeader.getConnectId());
-        buf.writeBytes(ByteBufUtil.getBytes(this.byteBuf));
-        return buf;
+        buf.writeBytes(this.bytes);
     }
 }

@@ -1,6 +1,7 @@
 package com.wangdiao.udp;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 
 import java.net.InetSocketAddress;
@@ -42,7 +43,7 @@ public class UdpClientContext {
         udpConnectContextChannel.receive(udpPacket);
     }
 
-    public CompletableFuture<UdpHeader> send(UdpPacket udpPacket) {
-        return udpConnectContextChannel.send(udpPacket);
+    public CompletableFuture<Void> send(ChannelHandlerContext ctx, ByteBuf byteBuf) {
+        return udpConnectContextChannel.send(ctx, byteBuf);
     }
 }

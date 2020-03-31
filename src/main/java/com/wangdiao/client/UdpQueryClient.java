@@ -1,7 +1,7 @@
 package com.wangdiao.client;
 
-import com.wangdiao.udp.UdpServerContext;
-import com.wangdiao.udp.UdpServerMessageHandle;
+import com.wangdiao.common.InputStringTestHandler;
+import com.wangdiao.udp.UdpClientMessageHandle;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -9,6 +9,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 
 /**
  * @author wangdiao
@@ -23,7 +26,7 @@ public class UdpQueryClient {
 
     public void run() throws Exception {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        UdpServerContext udpContext = new UdpServerContext();
+        final UdpClientMessageHandle udpClientMessageHandle = new UdpClientMessageHandle();
         try {
             Bootstrap b = new Bootstrap();
             b.group(workerGroup)
@@ -31,7 +34,9 @@ public class UdpQueryClient {
                     .handler(new ChannelInitializer<DatagramChannel>() {
                         @Override
                         protected void initChannel(DatagramChannel ch) throws Exception {
-                            ch.pipeline().addLast(new UdpQueryClientHandler(name), new UdpServerMessageHandle(udpContext));
+                            ch.pipeline().addLast(new UdpQueryClientHandler(name, udpClientMessageHandle), udpClientMessageHandle,
+                                    new ObjectEncoder(), new ObjectDecoder(ClassResolvers.weakCachingResolver(null)),
+                                    new InputStringTestHandler());
                         }
                     });
 

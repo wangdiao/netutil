@@ -1,6 +1,8 @@
 package com.wangdiao.udp;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.ReferenceCountUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,13 +12,16 @@ import java.util.stream.IntStream;
 public class Ack {
     public static final int MAX_COUNT = (1 << Byte.SIZE) - 1;
 
-    public static Collection<Integer> getAckPackets(ByteBuf buf) {
+    public static Collection<Integer> getAckPackets(byte[] bytes) {
         List<Integer> list = new ArrayList<>();
+        ByteBuf buf = ByteBufAllocator.DEFAULT.buffer();
+        buf.writeBytes(bytes);
         while (buf.readableBytes() >= 4) {
             int start = buf.readUnsignedMedium();
             int count = buf.readUnsignedByte();
             IntStream.range(start, start + count).forEach(list::add);
         }
+        ReferenceCountUtil.release(buf);
         return list;
     }
 

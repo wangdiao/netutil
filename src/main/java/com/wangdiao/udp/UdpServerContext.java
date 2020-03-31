@@ -1,7 +1,9 @@
 package com.wangdiao.udp;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.AttributeKey;
 
 import java.util.Map;
 import java.util.concurrent.*;
@@ -23,7 +25,7 @@ public class UdpServerContext {
         UdpConnectContextChannel connectContext = new UdpConnectContextChannel(connectId, ctx, executorService, packet.getSender(), listener);
         connectContextMap.put(connectId, connectContext);
         connectContext.sendAckDirect(packet.getUdpHeader().getPacketNumber());
-        connectContext.fireActive();
+        connectContext.fireActive(packet.getCtx());
     }
 
     public void passiveCloseChannel(UdpHeader udpHeader) throws InterruptedException {
@@ -42,7 +44,8 @@ public class UdpServerContext {
         connectContextMap.get(udpPacket.getUdpHeader().getConnectId()).receive(udpPacket);
     }
 
-    public CompletableFuture<UdpHeader> send(UdpPacket udpPacket) {
-        return connectContextMap.get(udpPacket.getUdpHeader().getConnectId()).send(udpPacket);
+    public CompletableFuture<Void> send(ChannelHandlerContext ctx, ByteBuf byteBuf) {
+        Long connectId = (Long) ctx.channel().attr(AttributeKey.newInstance("connectId")).get();
+        return connectContextMap.get(connectId).send(ctx, byteBuf);
     }
 }

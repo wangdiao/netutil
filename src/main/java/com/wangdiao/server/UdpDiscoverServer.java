@@ -12,6 +12,7 @@ import io.netty.channel.socket.nio.NioDatagramChannel;
 
 /**
  * @author wangdiao
+ * UDP发现服务：注册中心
  */
 public class UdpDiscoverServer {
     private int port;

@@ -1,5 +1,6 @@
 package com.wangdiao.client;
 
+import com.wangdiao.common.EchoHandler;
 import com.wangdiao.udp.UdpServerContext;
 import com.wangdiao.udp.UdpServerMessageHandle;
 import io.netty.bootstrap.Bootstrap;
@@ -9,9 +10,13 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 
 /**
  * @author wangdiao
+ * UDP注册客户端
  */
 public class UdpRegisterClient {
 
@@ -31,7 +36,8 @@ public class UdpRegisterClient {
                     .handler(new ChannelInitializer<DatagramChannel>() {
                         @Override
                         protected void initChannel(DatagramChannel ch) throws Exception {
-                            ch.pipeline().addLast(new UdpRegisterClientHandler(name), new UdpServerMessageHandle(udpContext));
+                            ch.pipeline().addLast(new UdpRegisterClientHandler(name), new UdpServerMessageHandle(udpContext),
+                                    new ObjectEncoder(), new ObjectDecoder(ClassResolvers.weakCachingResolver(null)), new EchoHandler());
                         }
                     });
 

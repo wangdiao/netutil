@@ -2,6 +2,8 @@ package com.wangdiao.model;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.io.Serializable;
 import java.net.InetAddress;
@@ -12,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * @author wangdiao
  */
+@Getter
+@ToString
 public class DiscoverData implements Serializable {
     private static final long serialVersionUID = -855649439655705207L;
     private CharSequence name;

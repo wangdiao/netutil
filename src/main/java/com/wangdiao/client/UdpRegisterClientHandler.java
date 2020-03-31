@@ -2,8 +2,6 @@ package com.wangdiao.client;
 
 import com.wangdiao.common.AppConstants;
 import com.wangdiao.model.DiscoverData;
-import com.wangdiao.udp.UdpServerContext;
-import com.wangdiao.udp.UdpServerMessageHandle;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandler;
@@ -21,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
     private String name;
     private volatile int status = AppConstants.UDP_CLIENT_STATUS_INIT;
-    private UdpServerMessageHandle udpMessageHandle;
 
     public UdpRegisterClientHandler(String name) {
         this.name = name;
@@ -46,7 +43,7 @@ public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
                 ByteBuf content = packet.content();
                 DiscoverData discoverData = new DiscoverData();
                 discoverData.read(content);
-                udpMessageHandle = new UdpServerMessageHandle(new UdpServerContext());
+                log.info("init register success. data={}", discoverData);
             } finally {
                 ReferenceCountUtil.release(packet);
             }
