@@ -4,6 +4,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
 import java.util.concurrent.*;
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * @author wangdiao
  */
+@Slf4j
 public class UdpServerContext {
     public static final ExecutorService executorService = new ThreadPoolExecutor(2, 2,
             0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
@@ -24,6 +26,7 @@ public class UdpServerContext {
         long connectId = atomicConnectId.incrementAndGet();
         UdpConnectContextChannel connectContext = new UdpConnectContextChannel(connectId, ctx, executorService, packet.getSender(), listener);
         connectContextMap.put(connectId, connectContext);
+        log.info("createConnectChannel connectId={} ctx={} packet={}", connectId, ctx, packet);
         connectContext.sendAckDirect(packet.getUdpHeader().getPacketNumber());
         connectContext.fireActive(packet.getCtx());
     }
@@ -45,7 +48,7 @@ public class UdpServerContext {
     }
 
     public CompletableFuture<Void> send(ChannelHandlerContext ctx, ByteBuf byteBuf) {
-        Long connectId = (Long) ctx.channel().attr(AttributeKey.newInstance("connectId")).get();
+        Long connectId = (Long) ctx.channel().attr(AttributeKey.valueOf("connectId")).get();
         return connectContextMap.get(connectId).send(ctx, byteBuf);
     }
 }

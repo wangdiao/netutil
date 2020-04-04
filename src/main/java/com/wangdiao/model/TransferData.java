@@ -2,6 +2,7 @@ package com.wangdiao.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.ToString;
 
 import java.io.Serializable;
 import java.net.SocketAddress;
@@ -18,6 +19,7 @@ public class TransferData implements Serializable {
     public static final int ACTIVE = 2;
     public static final int INACTIVE = 3;
     private SocketAddress address;
+    @ToString.Exclude
     private byte[] bytes;
     private int operate;
 }

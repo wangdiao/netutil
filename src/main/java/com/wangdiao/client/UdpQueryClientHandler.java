@@ -20,12 +20,14 @@ import java.nio.charset.StandardCharsets;
 public class UdpQueryClientHandler extends ChannelInboundHandlerAdapter {
 
     private final String name;
+    private InetSocketAddress discoverSocketAddress;
     private final UdpClientMessageHandle udpClientMessageHandle;
 
     private volatile int status = AppConstants.UDP_CLIENT_STATUS_INIT;
 
-    public UdpQueryClientHandler(String name, UdpClientMessageHandle udpClientMessageHandle) {
+    public UdpQueryClientHandler(String name, String discoverHost, int discoverPort, UdpClientMessageHandle udpClientMessageHandle) {
         this.name = name;
+        discoverSocketAddress = new InetSocketAddress(discoverHost, discoverPort);
         this.udpClientMessageHandle = udpClientMessageHandle;
     }
 
@@ -36,7 +38,7 @@ public class UdpQueryClientHandler extends ChannelInboundHandlerAdapter {
         buffer.writeInt(AppConstants.OP_QUERY);
         buffer.writeInt(ByteBufUtil.utf8Bytes(name));
         buffer.writeCharSequence(name, StandardCharsets.UTF_8);
-        DatagramPacket datagramPacket = new DatagramPacket(buffer, new InetSocketAddress("localhost", 9998));
+        DatagramPacket datagramPacket = new DatagramPacket(buffer, discoverSocketAddress);
         ctx.writeAndFlush(datagramPacket);
     }
 

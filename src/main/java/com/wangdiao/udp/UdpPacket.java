@@ -33,7 +33,8 @@ public class UdpPacket {
         UdpHeader header = new UdpHeader();
         byte b = byteBuf.readByte();
         header.setControl((b & 0b10000000) == 0b00000000);
-        header.setType(ControlMessageType.valueOf(b));
+        ControlMessageType type = header.isControl() ? ControlMessageType.valueOf((byte) (b & 0b1111111)) : ControlMessageType.DATA;
+        header.setType(type);
         header.setPacketNumber(byteBuf.readUnsignedMedium());
         header.setConnectId(byteBuf.readUnsignedInt());
         this.udpHeader = header;

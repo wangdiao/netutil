@@ -1,6 +1,5 @@
 package com.wangdiao.client;
 
-import com.wangdiao.common.EchoHandler;
 import com.wangdiao.udp.UdpServerContext;
 import com.wangdiao.udp.UdpServerMessageHandle;
 import io.netty.bootstrap.Bootstrap;
@@ -21,9 +20,17 @@ import io.netty.handler.codec.serialization.ObjectEncoder;
 public class UdpRegisterClient {
 
     private String name;
+    private String discoverHost;
+    private int discoverPort;
+    private String localHost;
+    private int localPort;
 
-    public UdpRegisterClient(String name) {
+    public UdpRegisterClient(String name, String discoverHost, int discoverPort, String localHost, int localPort) {
         this.name = name;
+        this.discoverHost = discoverHost;
+        this.discoverPort = discoverPort;
+        this.localHost = localHost;
+        this.localPort = localPort;
     }
 
     public void run() throws Exception {
@@ -36,8 +43,9 @@ public class UdpRegisterClient {
                     .handler(new ChannelInitializer<DatagramChannel>() {
                         @Override
                         protected void initChannel(DatagramChannel ch) throws Exception {
-                            ch.pipeline().addLast(new UdpRegisterClientHandler(name), new UdpServerMessageHandle(udpContext),
-                                    new ObjectEncoder(), new ObjectDecoder(ClassResolvers.weakCachingResolver(null)), new EchoHandler());
+                            ch.pipeline().addLast(new UdpRegisterClientHandler(name, discoverHost, discoverPort), new UdpServerMessageHandle(udpContext),
+                                    new ObjectEncoder(), new ObjectDecoder(ClassResolvers.weakCachingResolver(null)),
+                                    new RegisterClientHandler(localHost, localPort, workerGroup));
                         }
                     });
 
@@ -54,7 +62,7 @@ public class UdpRegisterClient {
     }
 
     public static void main(String[] args) throws Exception {
-        UdpRegisterClient client = new UdpRegisterClient("test1");
+        UdpRegisterClient client = new UdpRegisterClient("test1", "localhost", 9998, "localhost", 80);
         client.run();
     }
 }

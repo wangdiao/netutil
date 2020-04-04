@@ -18,10 +18,12 @@ import java.nio.charset.StandardCharsets;
 @ChannelHandler.Sharable
 public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
     private String name;
+    private InetSocketAddress discoverSocketAddress;
     private volatile int status = AppConstants.UDP_CLIENT_STATUS_INIT;
 
-    public UdpRegisterClientHandler(String name) {
+    public UdpRegisterClientHandler(String name, String discoverHost, int discoverPort) {
         this.name = name;
+        discoverSocketAddress = new InetSocketAddress(discoverHost, discoverPort);
     }
 
     @Override
@@ -31,7 +33,7 @@ public class UdpRegisterClientHandler extends ChannelInboundHandlerAdapter {
         buffer.writeInt(AppConstants.OP_REG);
         buffer.writeInt(ByteBufUtil.utf8Bytes(name));
         buffer.writeCharSequence(name, StandardCharsets.UTF_8);
-        DatagramPacket datagramPacket = new DatagramPacket(buffer, new InetSocketAddress("localhost", 9998));
+        DatagramPacket datagramPacket = new DatagramPacket(buffer, discoverSocketAddress);
         ctx.writeAndFlush(datagramPacket);
     }
 

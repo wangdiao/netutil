@@ -17,13 +17,12 @@ import java.net.InetSocketAddress;
 @Slf4j
 public class UdpServerMessageHandle extends ChannelDuplexHandler {
     private UdpServerContext udpContext;
+    public ContextListener contextListener = ContextListener.DEFAULT;
 
     public UdpServerMessageHandle(UdpServerContext udpContext) {
         this.udpContext = udpContext;
     }
 
-    public ContextListener contextListener = new ContextListener() {
-    };
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {

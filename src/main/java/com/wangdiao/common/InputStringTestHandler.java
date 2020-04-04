@@ -19,7 +19,9 @@ public class InputStringTestHandler extends ChannelInboundHandlerAdapter {
             random.nextBytes(bytes);
             sb.append(Base64.getEncoder().encodeToString(bytes)).append("\n");
         }
-        ctx.writeAndFlush(sb.toString());
+        String str = sb.toString();
+        log.info("write str len={}", str.length());
+        ctx.writeAndFlush(str);
     }
 
     @Override

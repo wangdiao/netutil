@@ -6,8 +6,12 @@ import io.netty.channel.ChannelHandlerContext;
 import java.util.EventListener;
 
 public interface ContextListener extends EventListener {
+
+    public static final ContextListener DEFAULT = new ContextListener() {
+    };
+
     default void onActive(ChannelHandlerContext ctx) {
-         ctx.fireChannelActive();
+        ctx.fireChannelActive();
     }
 
     default void onRead(ChannelHandlerContext ctx, ByteBuf buf) {

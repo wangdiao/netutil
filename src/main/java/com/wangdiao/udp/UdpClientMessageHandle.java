@@ -21,6 +21,7 @@ public class UdpClientMessageHandle extends ChannelDuplexHandler {
     private UdpClientContext udpContext;
     @Setter
     private InetSocketAddress peerSocketAddress;
+    public ContextListener contextListener = ContextListener.DEFAULT;
 
     public UdpClientMessageHandle() {
     }
@@ -29,8 +30,6 @@ public class UdpClientMessageHandle extends ChannelDuplexHandler {
         this.peerSocketAddress = peerSocketAddress;
     }
 
-    public ContextListener contextListener = new ContextListener() {
-    };
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -40,7 +39,7 @@ public class UdpClientMessageHandle extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        log.info("read {}", msg);
+        log.trace("read {}", msg);
         DatagramPacket packet = (DatagramPacket) msg;
         InetSocketAddress recipient = packet.recipient();
         InetSocketAddress sender = packet.sender();
